@@ -17,8 +17,7 @@ def fetch_data(url):
 
 def show():
     # Implement the button to clear cache
-
-    
+    col1, col2 = st.columns(2)
     data = fetch_data(inflation_URL)
 
     if data:
@@ -35,10 +34,36 @@ def show():
         # Pivot the dataframe to have years as columns, months as index, and inflation as values
         pivot_df = filtered_df.pivot(index='datum', columns='ar', values='inflation')
         
-        # Create a line chart
-        fig = px.line(pivot_df, x=pivot_df.index.month_name(), y=pivot_df.columns, title="Inflation Rate Over Time")
-
-        st.plotly_chart(fig)
+        # Create a line chart for the selected range
+        fig_range = px.line(pivot_df, x=pivot_df.index.month_name(), y=pivot_df.columns, title="Inflation Rate for Selected Range")
+        with col1:
+            st.plotly_chart(fig_range)
+            # Download data for Inflation
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                pivot_df.to_excel(writer, sheet_name="Inflationsdata")
+            excel_data = output.getvalue()
+            st.download_button(
+                label="Ladda ner som Excel",
+                data=excel_data,
+                file_name='inflation_data.xlsx',
+                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+        # Create a line chart for the filtered time series
+        fig_all = px.line(filtered_df, x='datum', y='inflation', title="Inflation Rate for Selected Years")
+        with col2: 
+            st.plotly_chart(fig_all)
+            # Download data for Inflation
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                filtered_df.to_excel(writer, sheet_name="Inflationsdata_historik")
+            excel_data = output.getvalue()
+            st.download_button(
+                label="Ladda ner som Excel",
+                data=excel_data,
+                file_name='inflation_data_line.xlsx',
+                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
 
     else:
         st.write(f"Failed to fetch data from API.")
