@@ -8,6 +8,7 @@ from io import BytesIO
 # API endpoint
 befolkning_URL = "https://nav.utvecklingfalkenberg.se/items/befolkning?limit=-1"
 
+# Så här kan man kommentera
 @st.cache_data
 def fetch_data(url):
     response = requests.get(url)
