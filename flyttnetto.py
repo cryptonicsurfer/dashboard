@@ -5,7 +5,6 @@ import requests
 import plotly.graph_objects as go
 from io import BytesIO
 
-# Move API endpoint out of the function to avoid duplication
 flyttnetto_URL = "https://nav.utvecklingfalkenberg.se/items/flyttnetto?limit=-1"
 
 @st.cache_data
@@ -16,85 +15,83 @@ def fetch_data(url):
     else:
         return None
 
+def save_to_excel(data, sheet_name):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        data.to_excel(writer, sheet_name=sheet_name)
+    return output.getvalue()
+
 def show():
-    
-    
     data = fetch_data(flyttnetto_URL)
 
-    if data:
-        df = pd.DataFrame(data)
-        df['datum'] = pd.to_datetime(df['datum'])
+    if not data:
+        st.write(f"Failed to fetch data from API.")
+        return
 
-        col1, col2 = st.columns(2)
+    df = pd.DataFrame(data)
+    df['datum'] = pd.to_datetime(df['datum'])
+    df['year'] = df['datum'].dt.year
 
-        # Creating age group buckets
-        age_group_size_10yr = 10
-        bins_10yr = list(range(0, 101, age_group_size_10yr))
-        labels_10yr = [f"{i}-{i + age_group_size_10yr - 1}" for i in bins_10yr[:-1]]
-        df['age_group_10yr'] = pd.cut(df['alder'], bins=bins_10yr, labels=labels_10yr, right=False)
+    grouped_net_migration = df.groupby('datum')['flyttnetto'].sum().reset_index()
+    fig_net_migration = px.bar(grouped_net_migration, x="datum", y="flyttnetto", title="Flyttnetto per år")
 
-        grouped_10yr = df.groupby(['datum', 'age_group_10yr'])['flyttnetto'].sum().unstack()
-        fig_age_group_10yr = px.bar(grouped_10yr, barmode='stack', title="Flyttnetto per åldersgrupp över tid")
+    age_group_size_10yr = 10
+    bins_10yr = list(range(0, 101, age_group_size_10yr))
+    labels_10yr = [f"{i}-{i + age_group_size_10yr - 1}" for i in bins_10yr[:-1]]
+    df['age_group_10yr'] = pd.cut(df['alder'], bins=bins_10yr, labels=labels_10yr, right=False)
+    grouped_10yr = df.groupby(['datum', 'age_group_10yr'])['flyttnetto'].sum().unstack()
 
-        with col1:
-            st.plotly_chart(fig_age_group_10yr)
-              # Download data for Age Group
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                grouped_10yr.to_excel(writer, sheet_name="Age_Group_Data")
-            excel_data = output.getvalue()
-            st.download_button(
-                label="Ladda ner som Excel",
-                data=excel_data,
-                file_name='age_group_data.xlsx',
-                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            )
+    yearly_cumulative = df.groupby(['year', 'age_group_10yr'])['flyttnetto'].sum().groupby(level=1).cumsum().unstack()
+    fig_relative_barmode = go.Figure(data=[go.Bar(x=yearly_cumulative.index, y=yearly_cumulative[age_group], name=age_group) for age_group in yearly_cumulative.columns])
+    fig_relative_barmode.update_layout(barmode='relative', title_text="Ackumulerad inflyttning över tid per åldersgrupp (Relative Barmode)")
 
-        # Line chart of net migration
-        grouped_net_migration = df.groupby('datum')['flyttnetto'].sum().reset_index()
-        fig_net_migration = px.line(grouped_net_migration, x="datum", y="flyttnetto", title="Net Migration Over Time")
+    total_yearly_cumulative = df.groupby('year')['flyttnetto'].sum().cumsum()
+    fig_total_yearly = px.line(total_yearly_cumulative, title="Total Ackumulerad inflyttning över tid")
 
-        with col2:
-            st.plotly_chart(fig_net_migration)
-            # Download data for Net Migration
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                grouped_net_migration.to_excel(writer, sheet_name="Net_Migration_Data")
-            excel_data = output.getvalue()
-            st.download_button(
-                label="Ladda ner som Excel",
-                data=excel_data,
-                file_name='net_migration_data.xlsx',
-                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            )
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.plotly_chart(fig_net_migration)
+        st.download_button(
+            label="Ladda ner som Excel",
+            data=save_to_excel(grouped_net_migration, "Net_Migration_Data"),
+            file_name='net_migration_data.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-        # Cumulative sum for flyttnetto
-        df_grouped = df.groupby(['datum', 'age_group_10yr'])['flyttnetto'].sum().groupby(level=1).cumsum().reset_index()
         
-       # Filter based on slider
+
+        st.write("---")
+
+        st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+
+        st.plotly_chart(fig_relative_barmode)
+        st.download_button(
+            label="Ladda ner som Excel (Relative Barmode Data)",
+            data=save_to_excel(yearly_cumulative, "Yearly_Cumulative_Data"),
+            file_name='yearly_cumulative_data.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    with col2:
+        st.plotly_chart(fig_total_yearly)
+        st.download_button(
+            label="Ladda ner som Excel",
+            data=save_to_excel(total_yearly_cumulative, "Total_Yearly_Cumulative"),
+            file_name='total_yearly_cumulative.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+        st.write("---")
+
         min_year = df['datum'].dt.year.min()
         max_year = df['datum'].dt.year.max()
         start_year, end_year = st.slider('Select a range of years', min_year, max_year, (max_year-10, max_year))
-
         filtered_df = df[(df['datum'].dt.year >= start_year) & (df['datum'].dt.year <= end_year)]
-
-        # Compute the cumulative sum on the filtered dataframe
         filtered_df_grouped = filtered_df.groupby(['datum', 'age_group_10yr'])['flyttnetto'].sum().groupby(level=1).cumsum().reset_index()
-
-        fig_cumsum = px.line(filtered_df_grouped, x="datum", y="flyttnetto", color="age_group_10yr", title="Accumulated Flyttnetto Over Time")
-
+        fig_cumsum = px.line(filtered_df_grouped, x="datum", y="flyttnetto", color="age_group_10yr", title="Ackumulerat flyttnetto över tid på åldersgruppsnivå")
+        
         st.plotly_chart(fig_cumsum)
-        # Download data for Net Migration
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            filtered_df_grouped.to_excel(writer, sheet_name="filtered_df_grouped")
-        excel_data = output.getvalue()
         st.download_button(
             label="Ladda ner som Excel",
-            data=excel_data,
+            data=save_to_excel(filtered_df_grouped, "filtered_df_grouped"),
             file_name='filtered_df_grouped.xlsx',
-            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-    else:
-        st.write(f"Failed to fetch data from API. Status code: {response.status_code}")

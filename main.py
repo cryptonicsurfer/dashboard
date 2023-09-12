@@ -4,6 +4,7 @@ from anvandning import show as show_anvandning
 from flyttnetto import show as show_flyttnetto
 from inflation import show as show_inflation
 from konkurser import show as show_konkurser
+from arbetsloshet import show as show_arbetsloshet
 
 # Import other pages similarly
 
@@ -12,7 +13,7 @@ st.header('Falkenberg Dashboard :chart:')
 
 def main():
     st.sidebar.title("Navigation")
-    selection = st.sidebar.radio("Go to", ["Användning", "Befolkning", "Flyttnetto", "Inflation", "Konkurser"])  # Add other pages as needed
+    selection = st.sidebar.radio("Go to", ["Användning", "Befolkning", "Flyttnetto", "Inflation", "Konkurser", "Arbetslöshet"])  # Add other pages as needed
 
     if selection == "Befolkning":
         show_befolkning()
@@ -24,6 +25,8 @@ def main():
         show_inflation()
     elif selection == "Konkurser":
         show_konkurser()
+    elif selection =="Arbetslöshet":
+        show_arbetsloshet()
     # Add more elif conditions for other pages
 
 if __name__ == "__main__":

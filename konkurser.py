@@ -87,3 +87,4 @@ def show():
                 file_name='anstallda_data.xlsx',
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
+            st.write(konkurser_df)

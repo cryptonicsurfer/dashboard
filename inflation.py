@@ -3,6 +3,9 @@ import pandas as pd
 import plotly.express as px
 import requests
 from io import BytesIO
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+import os
 
 # Move API endpoint out of the function to avoid duplication
 inflation_URL = "https://nav.utvecklingfalkenberg.se/items/inflation?limit=-1"
@@ -24,12 +27,20 @@ def show():
         df = pd.DataFrame(data)
         df['datum'] = pd.to_datetime(df['datum'])
         
+        # Get the most recent year from the dataframe
+        current_year = df['datum'].dt.year.max()
+        last_year = current_year - 1
+
         # Get year range
         min_year = df['ar'].min()
         max_year = df['ar'].max()
         start_year, end_year = st.slider('Select a range of years', int(min_year), int(max_year), (int(max_year)-6, int(max_year)))
 
         filtered_df = df[(df['ar'].astype(int) >= start_year) & (df['ar'].astype(int) <= end_year)]
+
+        #remove duplicates if any (using years and datum)
+        filtered_df = filtered_df.drop_duplicates(subset=['datum', 'ar'])
+
 
         # Pivot the dataframe to have years as columns, months as index, and inflation as values
         pivot_df = filtered_df.pivot(index='datum', columns='ar', values='inflation')
@@ -64,6 +75,6 @@ def show():
                 file_name='inflation_data_line.xlsx',
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
-
+       
     else:
         st.write(f"Failed to fetch data from API.")
