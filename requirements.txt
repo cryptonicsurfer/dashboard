@@ -3,6 +3,5 @@ pandas
 plotly
 requests
 xlsxwriter
-beautifulsoup
 
 
