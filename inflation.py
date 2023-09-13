@@ -3,8 +3,6 @@ import pandas as pd
 import plotly.express as px
 import requests
 from io import BytesIO
-from bs4 import BeautifulSoup
-from dotenv import load_dotenv
 import os
 
 # Move API endpoint out of the function to avoid duplication
